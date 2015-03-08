@@ -32,7 +32,31 @@ Generated rules are: `latest(pkg(Name,Version))`, `pkg_depends(pkg(N,V),pkg(N,V)
 
 User-provided rules are: `want(X)`, `depends(X,Y)`
 
-## Example
+## Unit Tests
+
+To test real operating system provisioning, you must have Vagrant and VirtualBox installed. The test provisions
+virtualized FreeBSD 10.1.
+
+```shell
+$ git clone https://github.com/mprymek/symconfig.git
+$ cd symconfig
+$ (cd test/fixtures/vagrant && vagrant up)
+$ mix deps.get
+$ mix test
+$ (cd test/fixtures/vagrant && vagrant destroy -f)
+```
+
+If you don't want to install Vagrant or download FreeBSD image, you can run inference tests only with:
+
+```shell
+$ git clone https://github.com/mprymek/symconfig.git
+$ cd symconfig
+$ mix test test/inference_test.exs
+```
+
+## Under the Hood
+
+This chapter illustrates how the process of operating system provisioning looks like under the hood.
 
 The usage of the expert system is as follows:
   1. define the desired system's functions
@@ -67,7 +91,7 @@ pkg_depends(pkg("nginx","1.6.2_1,2"),pkg("pcre","8.35_2")).
 file_meta(pkg("nginx","1.6.2_1,2"),"/usr/local/etc/nginx/nginx.conf-dist",file,0,0,644,[uarch],2693,"6418ea5b53e0c2b4e9baa517fce7ccf7619db03af68de7445dccb2c857978a4a").
 
 % relations between distribution-provided configuration files and their templated versions
-managed_file_src("/usr/local/etc/nginx/nginx.conf-dist","/usr/local/etc/nginx/nginx.conf").
+peex_managed("/usr/local/etc/nginx/nginx.conf-dist","/usr/local/etc/nginx/nginx.conf","patch-nginx.conf").
 
 % "deadbeaf" is of course not a valid sha256 checksum. It's given as just an example here...
 managed_file_sha256("6418ea5b53e0c2b4e9baa517fce7ccf7619db03af68de7445dccb2c857978a4a","deadbeaf").

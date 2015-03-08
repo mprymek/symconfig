@@ -12,7 +12,7 @@ defmodule Symconfig.Mixfile do
   #
   # Type `mix help compile.app` for more information
   def application do
-    [applications: [:logger]]
+    [applications: [:logger,:ssh]]
   end
 
   # Dependencies can be Hex packages:
@@ -25,6 +25,7 @@ defmodule Symconfig.Mixfile do
   #
   # Type `mix help deps` for more examples and options
   defp deps, do: [
-    {:exlog, path: "../elixir-libs/exlog"},
+    {:hex_str, github: "mprymek/hex", ref: "5dc1870668"},
+    {:exlog, github: "mprymek/exlog", ref: "a383b13a06"},
   ]
 end

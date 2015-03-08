@@ -1,0 +1,13 @@
+--- priv/cache/6418ea5b53e0c2b4e9baa517fce7ccf7619db03af68de7445dccb2c857978a4a	2015-03-01 05:35:19.399087148 +0100
++++ priv/templates/nginx.conf	2015-02-28 01:46:38.000000000 +0100
+@@ -33,8 +33,8 @@
+     #gzip  on;
+ 
+     server {
+-        listen       80;
+-        server_name  localhost;
++        listen       <%= port || 80 %>;
++        server_name  <%= server || "localhost" %>;
+ 
+         #charset koi8-r;
+ 

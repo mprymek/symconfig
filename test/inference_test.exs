@@ -2,26 +2,25 @@ defmodule InferenceTest do
   use ExUnit.Case, async: true
   use Exlog
   require Logger
-  alias Symconfig.Inference, as: I
+  alias SymConfig.Inference, as: I
 
   setup_all do
     e0 = Exlog.new
         |> consult!("priv/symconfig.pl")
-    e1 = Exlog.new
-        |> consult!("priv/symconfig.pl")
-        |> consult!("priv/example1.pl")
-    e2 = Exlog.new
-        |> consult!("priv/symconfig.pl")
-        |> consult!("priv/example2.pl")
+    e1 = e0
+        |> consult!("test/fixtures/priv/example1.pl")
+    e2 = e0
+        |> consult!("test/fixtures/priv/example2.pl")
     {:ok, %{e0: e0, e1: e1, e2: e2}}
   end
 
-  @tag :example1
-  test "Iteratively achieve the acceptable state in example1", %{e1: e} do
+  @tag :example1i
+  test "example1 iteratively", %{e1: e} do
+
     assert e |> I.required |> Enum.sort == [
-      installed: {:pkg, 'nginx', '1.6.2_1,2'},
-      managed: {:file, '/usr/local/etc/nginx/nginx.conf'},
-      running: {:svc, 'nginx'},
+      {:installed, {:pkg, 'nginx', '1.6.2_1,2'}},
+      {:running, {:svc, 'nginx'}},
+      {:file_meta, '/usr/local/etc/nginx/nginx.conf', :file, 0, 0, 644, [:uarch], 2701, 'deadbeaf'},
     ]
 
     [{:verify,ta1}] = e |> I.to_achieve(:acceptable_state)
@@ -30,7 +29,7 @@ defmodule InferenceTest do
     {e, {true,[]}} = e |> e_prove( {:assert,{:detected,ta1}} )
 
     [{:verify,ta1}] = e |> I.to_achieve(:acceptable_state)
-    assert ta1 == {:sha256, '/usr/local/etc/nginx/nginx.conf', 'deadbeaf'}
+    assert ta1 == {:file_meta, '/usr/local/etc/nginx/nginx.conf', :file, 0, 0, 644, [:uarch], 2701, 'deadbeaf'}
 
     {e, {true,[]}} = e |> e_prove( {:assert,{:detected,ta1}} )
 
@@ -44,11 +43,11 @@ defmodule InferenceTest do
   end
 
   @tag :example1
-  test "Find a way to the acceptable state in example1", %{e1: e} do
+  test "example1", %{e1: e} do
     way = e |> I.all_to_achieve(:acceptable_state)
     assert way == [
       [verify: {:installed, {:pkg, 'nginx', '1.6.2_1,2'}}],
-      [verify: {:sha256, '/usr/local/etc/nginx/nginx.conf', 'deadbeaf'}],
+      [verify: {:file_meta, '/usr/local/etc/nginx/nginx.conf', :file, 0, 0, 644, [:uarch], 2701, 'deadbeaf'}],
       [verify: {:running, {:svc, 'nginx'}}],
     ]
   end
@@ -59,18 +58,26 @@ defmodule InferenceTest do
       {:verify,x},e ->
         {e, {true,[]}} = e |> e_prove( {:assert,{:detected,x}} )
         e
+      {:manage,_x},_e ->
+        raise "manage(...) not implemented"
     end)
     {e,tgt}
   end
 
-  @tag :example2
-  test "iteratively achieve the acceptable state in example2", %{e2: e} do
+  @tag :example2i
+  test "example2 iteratively", %{e2: e} do
+    #{e, res} = e |> prove_all( mngd_layer(X) )
+    #{e, res} = e |> prove_all( os_pkg_layer(X) )
+    #{e, res} = e |> prove_all( peex_managed(X,Y) )
+    #assert res == nil
+
     assert e |> I.required |> Enum.sort == [
-      installed: {:os, :freebsd, '10.1-RELEASE-p5'},
-      installed: {:pkg, 'nginx', '1.6.2_1,2'},
-      managed: {:file, '/etc/ssh/sshd_config'},
-      managed: {:file, '/usr/local/etc/nginx/nginx.conf'},
-      running: {:svc, 'nginx'}, running: {:svc, 'sshd'}
+      {:installed, {:os, :freebsd, '10.1-RELEASE-p5'}},
+      {:installed, {:pkg, 'nginx', '1.6.2_1,2'}},
+      {:running, {:svc, 'nginx'}},
+      {:running, {:svc, 'sshd'}},
+      {:file_meta, '/etc/ssh/sshd_config', :file, 0, 0, 644, [:uarch], 4046, 'ba11ad'},
+      {:file_meta, '/usr/local/etc/nginx/nginx.conf', :file, 0, 0, 644, [:uarch], 2701, 'deadbeaf'}
     ]
 
     {e, tgt} = get_and_reach e, :acceptable_state
@@ -81,31 +88,27 @@ defmodule InferenceTest do
 
     {e, tgt} = get_and_reach e, :acceptable_state
     assert length(tgt) == 2
-    assert {:verify, {:sha256, '/usr/local/etc/nginx/nginx.conf', 'deadbeaf'}} in tgt
-    assert {:verify, {:sha256, '/etc/ssh/sshd_config', 'ba11ad'}} in tgt
+    assert {:verify, {:file_meta, '/usr/local/etc/nginx/nginx.conf', :file, 0, 0, 644, [:uarch], 2701, 'deadbeaf'}} in tgt
+    assert {:verify, {:file_meta, '/etc/ssh/sshd_config', :file, 0, 0, 644, [:uarch], 4046, 'ba11ad'}} in tgt
 
     {e, tgt} = get_and_reach e, :acceptable_state
     assert length(tgt) == 2
     assert {:verify, {:running, {:svc, 'nginx'}}} in tgt
     assert {:verify, {:running, {:svc, 'sshd'}}} in tgt
 
-    {e, tgt} = get_and_reach e, :acceptable_state
+    {_e, tgt} = get_and_reach e, :acceptable_state
     assert length(tgt) == 0
   end
 
-  #@tag :example2
-  #test "find a way to the acceptable state in example2", %{e2: e} do
-  #  way = e |> I.all_to_achieve(:acceptable_state)
-  #  assert way == [
-  #    [verify: {:sha256, '/etc/ssh/sshd_config', 'ba11ad'}, verify: {:installed, {:pkg, 'nginx', '1.6.2_1,2'}}],
-  #    [verify: {:sha256, '/usr/local/etc/nginx/nginx.conf', 'deadbeaf'}, verify: {:running, {:svc, 'sshd'}}],
-  #    [verify: {:running, {:svc, 'nginx'}}],
-  #  ]
-  #end
-
-
-  @tag :pokusy
-  test "", %{e0: e} do
-
+  @tag :example2
+  test "example2", %{e2: e} do
+    way = e |> I.all_to_achieve(:acceptable_state)
+    assert way == [
+      [verify: {:installed, {:os, :freebsd, '10.1-RELEASE-p5'}}, verify: {:installed, {:pkg, 'nginx', '1.6.2_1,2'}}],
+      [verify: {:file_meta, '/usr/local/etc/nginx/nginx.conf', :file, 0, 0, 644, [:uarch], 2701, 'deadbeaf'},
+       verify: {:file_meta, '/etc/ssh/sshd_config', :file, 0, 0, 644, [:uarch], 4046, 'ba11ad'}],
+      [verify: {:running, {:svc, 'nginx'}}, verify: {:running, {:svc, 'sshd'}}],
+    ]
   end
+
 end

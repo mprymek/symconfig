@@ -1,0 +1,13 @@
+--- orig
++++ template
+@@ -14,7 +14,9 @@
+ # Note that some of FreeBSD's defaults differ from OpenBSD's, and
+ # FreeBSD has a few additional options.
+ 
+-#Port 22
++<%= for port <- ports do %>
++Port <%= port %>
++<% end %>
+ #AddressFamily any
+ #ListenAddress 0.0.0.0
+ #ListenAddress ::

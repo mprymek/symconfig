@@ -32,11 +32,15 @@ file_meta(os(freebsd,"10.1-RELEASE-p5"),"/etc/ssh/sshd_config",file,0,0,644,[uar
 %% rules generated in the file templating/managing process
 %%
 
-managed_file_src("/usr/local/etc/nginx/nginx.conf-dist","/usr/local/etc/nginx/nginx.conf").
-managed_file_sha256("6418ea5b53e0c2b4e9baa517fce7ccf7619db03af68de7445dccb2c857978a4a","deadbeaf").
+latest(patch("patch-nginx.conf","0001")).
+peex_managed("/usr/local/etc/nginx/nginx.conf-dist","/usr/local/etc/nginx/nginx.conf","patch-nginx.conf").
+patch_cache("6418ea5b53e0c2b4e9baa517fce7ccf7619db03af68de7445dccb2c857978a4a","patch sha here","tmplsha1").
+eex_cache("tmplsha1","var hash here",2701,"deadbeaf").
 
-managed_file_inplace("/etc/ssh/sshd_config").
-managed_file_sha256("26748c51687fe4f09ac6c8ace864d0c545f1fc0aa059bb9bffd80f80c0d62d85","ba11ad").
+latest(patch("patch-sshd_conf","0001")).
+peex_managed("/etc/ssh/sshd_config","/etc/ssh/sshd_config","patch-sshd_config").
+patch_cache("26748c51687fe4f09ac6c8ace864d0c545f1fc0aa059bb9bffd80f80c0d62d85","patch sha here","tmplsha2").
+eex_cache("tmplsha2","var hash here",4046,"ba11ad").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% EXAMPLE USER-PROVIDED RULES
@@ -45,9 +49,9 @@ managed_file_sha256("26748c51687fe4f09ac6c8ace864d0c545f1fc0aa059bb9bffd80f80c0d
 %% services dependencies - general part, same for all servers
 %%
 
-depends(running(svc("nginx")),installed(pkg("nginx"))).
+depends(running(svc("nginx")),installed(pkg("nginx",latest))).
 depends(running(svc("nginx")),managed(file("/usr/local/etc/nginx/nginx.conf"))).
-depends(managed(file("/usr/local/etc/nginx/nginx.conf")),installed(pkg("nginx"))).
+depends(managed(file("/usr/local/etc/nginx/nginx.conf")),installed(pkg("nginx",latest))).
 
 depends(running(svc("sshd")),managed(file("/etc/ssh/sshd_config"))).
 % @TODO: this should be autodetected!

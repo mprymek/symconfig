@@ -21,4 +21,19 @@ use Mix.Config
 # Configuration from the imported file will override the ones defined
 # here (which is why it is important to import them last).
 #
-#     import_config "#{Mix.env}.exs"
+
+
+config :logger, :console,
+  format: "\n[$level] $levelpad$message"
+
+config :sym_config,
+  cache_dir:     "priv/cache",
+  orig_dir:      "priv/orig",
+  patches_dir:   "priv/patches",
+  ssh_dir:       "priv/ssh",
+  templates_dir: "priv/templates"
+
+
+
+# load env-specific overrides
+import_config "#{Mix.env}.exs"

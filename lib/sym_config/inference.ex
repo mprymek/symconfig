@@ -1,4 +1,4 @@
-defmodule Symconfig.Inference do
+defmodule SymConfig.Inference do
   require Logger
   use Exlog
 
@@ -14,7 +14,7 @@ defmodule Symconfig.Inference do
 
   def all_to_achieve(e,state,actions) do
     case e |> prove_all( to_achieve(state,X) ) do
-      {e,[]} ->
+      {_e,[]} ->
         Enum.reverse actions
       {e,res} ->
         tgts = res |> Enum.map(fn
@@ -25,7 +25,7 @@ defmodule Symconfig.Inference do
             {e, {true,[]}} = e |> e_prove( {:assert,{:detected,item}} )
             e
           x, _e ->
-            raise "Unexpected step: #{inspect x}"
+            raise "Can't simulate step: #{inspect x}"
         end)
         #Logger.info "tgts = #{inspect tgts}"
         all_to_achieve e, state, [tgts|actions]
