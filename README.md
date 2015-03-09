@@ -32,6 +32,10 @@ Generated rules are: `latest(pkg(Name,Version))`, `pkg_depends(pkg(N,V),pkg(N,V)
 
 User-provided rules are: `want(X)`, `depends(X,Y)`
 
+## Example
+
+For (almost) real-life, self-contained example please see https://github.com/mprymek/symconfig-example1
+
 ## Unit Tests
 
 To test real operating system provisioning, you must have Vagrant and VirtualBox installed. The test provisions
