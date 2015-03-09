@@ -22,6 +22,7 @@ defmodule Actor.FreeBSD do
     # download source file if not cached
     src_fpath = Path.join [Cfg.orig_dir, src_sha]
     unless File.exists? src_fpath do
+      Logger.info "Downloading source file #{src_file} to #{src_fpath}"
       {sc,src_content} = get_file sc, src_file
       :ok = write_secure src_fpath, src_content
       src_sha2 = sha256 src_fpath
@@ -182,7 +183,8 @@ defmodule Actor.FreeBSD do
   end
 
   defp dead_end(msg) do
-    raise "#{@name} in a dead end: #{msg}"
+    Logger.error "#{@name} in a dead end: #{msg}"
+    exit {:dead_end,msg}
   end
 
   defp tmp_file(options\\[]) do
