@@ -21,7 +21,7 @@ file_meta(pkg("nginx","1.6.2_1,2"),"/usr/local/etc/nginx/nginx.conf-dist",file,0
 %%
 
 latest(patch("patch-nginx.conf","0001")).
-peex_managed("/usr/local/etc/nginx/nginx.conf-dist","/usr/local/etc/nginx/nginx.conf","patch-nginx.conf").
+peex_managed("/usr/local/etc/nginx/nginx.conf-dist","/usr/local/etc/nginx/nginx.conf","patch-nginx.conf",nginx).
 patch_cache("6418ea5b53e0c2b4e9baa517fce7ccf7619db03af68de7445dccb2c857978a4a","patch-nginx.conf","tmplsha").
 eex_cache("tmplsha","varshash",2701,"deadbeaf").
 
@@ -40,5 +40,7 @@ depends(managed(file("/usr/local/etc/nginx/nginx.conf")),installed(pkg("nginx",l
 %%
 %% required state definition for particular server
 %%
+
+varset_hash(nginx,"varshash").
 
 want(running(svc("nginx"))).

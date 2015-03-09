@@ -15,4 +15,6 @@ defmodule SymConfig.Cfg do
   def templates_dir, do:
     Application.get_env(:sym_config,:templates_dir,"priv/templates")
 
+  def pl_dir, do:
+    Application.get_env(:sym_config,:pl_dir,"priv")
 end

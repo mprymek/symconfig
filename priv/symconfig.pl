@@ -16,7 +16,7 @@
 %        detected/1,
 %        want/1,
 %        depends/2,
-%        peex_managed/3,
+%        peex_managed/4,
 %        patch_cache/3,
 %        eex_cache/4.
 
@@ -32,7 +32,7 @@ file_meta(_,_,_,_,_,_,_,_,_) :- fail.
 detected(_) :- fail.
 want(_) :- fail.
 depends(_,_) :- fail.
-peex_managed(_,_,_) :- fail.
+peex_managed(_,_,_,_) :- fail.
 patch_cache(_,_,_) :- fail.
 eex_cache(_,_,_,_) :- fail.
 
@@ -69,19 +69,20 @@ exp_symbolic1(X,X).
 symbolic2(managed(file(DstFile)),file_meta(DstFile,Type,Uid,Gid,Mode,Flags,Size,MngdSha)) :-
     mngd_layer(file_meta(DstFile,Type,Uid,Gid,Mode,Flags,Size,MngdSha)),
     !.
-symbolic2(managed(file(DstFile)),cache_miss(eex_cache(TemplSha,"vars hash here",unknown,unknown))) :-
-    peex_managed(SrcFile,DstFile,_PatchId),
+symbolic2(managed(file(DstFile)),cache_miss(eex_cache(TemplSha,VarsetHash,unknown,unknown))) :-
+    peex_managed(SrcFile,DstFile,_PatchId,VarSet),
+    varset_hash2(VarSet,VarsetHash),
     os_pkg_layer(file_meta(SrcFile,_,_,_,_,_,_,SrcSha)),
     patch_cache(SrcSha,_PatchId,TemplSha),
     !.
-symbolic2(managed(file(DstFile)),cache_miss(patch_cache(SrcFile,SrcSha,PatchId,PatchVer))) :-
-    peex_managed(SrcFile,DstFile,PatchId),
+symbolic2(managed(file(DstFile)),cache_miss(patch_cache(SrcFile,SrcSha,PatchId,PatchVer,VarSet))) :-
+    peex_managed(SrcFile,DstFile,PatchId,VarSet),
     latest(patch(PatchId,PatchVer)),
     os_pkg_layer(file_meta(SrcFile,_,_,_,_,_,_,SrcSha)),
     !.
 % @TODO: when latest_patch fact is missing, we get unknown src
 symbolic2(managed(file(DstFile)),error(unknown_src_file(SrcFile))) :-
-    peex_managed(SrcFile,DstFile,_PatchId),
+    peex_managed(SrcFile,DstFile,_PatchId,_VarSet),
     !.
 
 exp_symbolic2(X,Y) :- symbolic2(X,Y),!.
@@ -119,11 +120,11 @@ detected2(Y) :- detected(X),symbolic2(X,Y).
 justified(X) :- required(X).
 justified(FileMeta) :- top_layer(FileMeta).
 
-managed(SrcFile,DstFile) :- peex_managed(SrcFile,DstFile,_PatchId),!.
+managed(SrcFile,DstFile) :- peex_managed(SrcFile,DstFile,_PatchId,_VarSet),!.
 
-peex_cache(SrcSha,PatchId,TemplSha,VarsHash,DstSize,DstSha) :-
+peex_cache(SrcSha,PatchId,TemplSha,VarsetHash,DstSize,DstSha) :-
     patch_cache(SrcSha,PatchId,TemplSha),
-    eex_cache(TemplSha,VarsHash,DstSize,DstSha).
+    eex_cache(TemplSha,VarsetHash,DstSize,DstSha).
 
 % os_layer + pkg_layer + mngd_layer
 top_layer(FileMeta) :- mngd_layer(FileMeta).
@@ -132,9 +133,15 @@ top_layer(file_meta(Path,Type,Uid,Gid,Mode,Flags,Size,Sha256)) :-
     not(mngd_layer(file_meta(Path,_,_,_,_,_,_,_))).
 
 mngd_layer(file_meta(DstFile,Type,Uid,Gid,Mode,Flags,MngdSize,MngdSha)) :-
-    peex_managed(SrcFile,DstFile,_PatchId),
-    peex_cache(SrcSha,_,_,_,MngdSize,MngdSha),
+    peex_managed(SrcFile,DstFile,_PatchId,VarSet),
+    varset_hash2(VarSet,VarsetHash),
+    peex_cache(SrcSha,_PatchId,_TemplSha,VarsetHash,MngdSize,MngdSha),
     os_pkg_layer(file_meta(SrcFile,Type,Uid,Gid,Mode,Flags,_Size,SrcSha)).
+
+varset_hash2(nil,113427502) :- !.
+varset_hash2(VarSet,VarsetHash) :- varset_hash(VarSet,VarsetHash),!.
+varset_hash2(VarSet,VarsetHash) :-
+    throw(missing_varset_hash(VarSet)).
 
 % os layer + pkg layer
 os_pkg_layer(FileMeta) :- pkg_layer(FileMeta).
@@ -168,6 +175,7 @@ print_unverified :- unverified(X),nice_print(X),fail.
 prepared_verifications(X) :- unverified(X),not((depends2(X,Y),not(verified(Y)))).
 
 to_action(cache_miss(X),fill_cache(X)) :- !.
+to_action(error(X),error(X)) :- !.
 to_action(X,verify(X)).
 
 %prepared_actions1(verify(file_meta(F,Type,Uid,Gid,Mode,Flags,Size,Sha256))) :-

@@ -4,26 +4,47 @@ defmodule HighlevelTest do
   require Exlog
   alias SymConfig, as: SC
   require SC
+  import SymConfig.Spec, only: [varset_hash: 2]
 
   @host "127.0.0.1"
   @user "root"
   @port 2222
 
+  @vars %{
+      nginx: [
+        port: 80,
+        server: "www.example.com",
+      ],
+      sshd: [
+        ports: [22,3333],
+      ],
+    }
+
   setup_all do
     os_ver = "10.1-RELEASE-p4-amd64"
 
-    sc = SC.init(@host, @user, @port, [silently_accept_hosts: true])
+    vars_hashes = @vars |> Enum.map(fn
+      {varset,content} ->
+        varset_hash(varset,:erlang.phash2(content))
+    end)
+    Logger.debug "vars_hashes = #{inspect vars_hashes, [pretty: true]}"
+
+    sc = SC.init(@vars, @host, @user, @port, [silently_accept_hosts: true])
          |> SC.db_cache_or_fn("example3", fn sc ->
            sc = sc
+              #|> SC.load_mtree({:os,:freebsd,os_ver},"test/fixtures/priv/freebsd-#{os_ver}.mtree")
+              #|> SC.load_pkgdeps("test/fixtures/priv/repo-gosw.pkgdeps")
               |> SC.load_pkgdeps("test/fixtures/priv/repo-min-nginx.pkgdeps")
+              #|> SC.load_pl("test/fixtures/priv/repo-gosw-deps.pl")
            sc.edb
          end)
+         |> SC.assert!(vars_hashes)
 
     {:ok, %{sc: sc, os_ver: os_ver}}
   end
 
   test "connect to server" do
-    sc = SC.init @host, @user, @port, [silently_accept_hosts: true]
+    sc = SC.init @vars, @host, @user, @port, [silently_accept_hosts: true]
 
     {sc,res} = sc |> SC.cmd("echo xyz abc")
     assert res == {0,"xyz abc\n"}
@@ -56,9 +77,9 @@ defmodule HighlevelTest do
       {:file_meta,nginx_pkg, "/usr/local/etc/nginx", :dir, 0, 0, 755, [:uarch], nil, nil},
       {:file_meta,nginx_pkg,"/usr/local/etc/nginx/nginx.conf-dist",:file,0,0,644,[:uarch],2693,"6418ea5b53e0c2b4e9baa517fce7ccf7619db03af68de7445dccb2c857978a4a"},
       {:latest,{:patch,"patch-nginx.conf","0001"}},
-      {:peex_managed,"/usr/local/etc/nginx/nginx.conf-dist","/usr/local/etc/nginx/nginx.conf","patch-nginx.conf"},
-      {:patch_cache, "6418ea5b53e0c2b4e9baa517fce7ccf7619db03af68de7445dccb2c857978a4a", "5b73051af98760dc13157bea4924efd58476480e2a9aba2134ffc895c2ae9c80", "3360af05330d4a6c0a575f820aec57edac19f3de9053941233920ac7d1ea0230"}, 
-      {:eex_cache, "3360af05330d4a6c0a575f820aec57edac19f3de9053941233920ac7d1ea0230", 64247892, 2701, "8f123060d309acf6ace6dd4902aa9d60dcadca1153aed5f43f9966df78c9403a"},
+      {:peex_managed,"/usr/local/etc/nginx/nginx.conf-dist","/usr/local/etc/nginx/nginx.conf","patch-nginx.conf",:nginx},
+      {:patch_cache, "6418ea5b53e0c2b4e9baa517fce7ccf7619db03af68de7445dccb2c857978a4a", "patch-nginx.conf", "3360af05330d4a6c0a575f820aec57edac19f3de9053941233920ac7d1ea0230"},
+      {:eex_cache, "3360af05330d4a6c0a575f820aec57edac19f3de9053941233920ac7d1ea0230", 69552268, 2699, "8efafdf496494b41f20a7c78d2b009c0d172480517b0af6eabb4052b41be7c04"},
       {:depends,{:running,{:svc,"nginx"}},{:installed,{:pkg,"nginx",:latest}}},
       {:depends,{:running,{:svc,"nginx"}},{:managed,{:file,"/usr/local/etc/nginx/nginx.conf"}}},
       {:depends,{:managed,{:file,"/usr/local/etc/nginx/nginx.conf"}},{:installed,{:pkg,"nginx",:latest}}},
@@ -100,7 +121,7 @@ defmodule HighlevelTest do
     my_svc = svc "nginx"
     my_pkg = pkg "nginx"
     sc |> SC.assert!([
-      {:peex_managed,"/usr/local/etc/nginx/nginx.conf-dist","/usr/local/etc/nginx/nginx.conf","patch-nginx.conf"},
+      {:peex_managed,"/usr/local/etc/nginx/nginx.conf-dist","/usr/local/etc/nginx/nginx.conf","patch-nginx.conf",:nginx},
       depends(my_svc,my_pkg),
       depends(my_svc,my_cfg),
       depends(my_cfg,my_pkg),
@@ -113,7 +134,7 @@ defmodule HighlevelTest do
     my_svc = svc "sshd"
     [[Os: wos, Ver: wos_ver]] = sc |> SC.query( want(installed(os(Os,Ver))) )
     sc |> SC.assert!([
-      {:peex_managed,"/etc/ssh/sshd_config","/etc/ssh/sshd_config","patch-sshd_config"},
+      {:peex_managed,"/etc/ssh/sshd_config","/etc/ssh/sshd_config","patch-sshd_config",:sshd},
       depends(my_svc,my_cfg),
       depends(my_cfg,os(wos,wos_ver)),
       want(my_svc),
@@ -159,14 +180,13 @@ defmodule HighlevelTest do
   @tag :provision2
   test "provision 2", %{sc: sc} do
     sc = sc |> SC.assert!([
+      # nginx.conf
       {:patch_cache, "6418ea5b53e0c2b4e9baa517fce7ccf7619db03af68de7445dccb2c857978a4a",
-                     "patch-nginx.conf-0001",
-                     "3360af05330d4a6c0a575f820aec57edac19f3de9053941233920ac7d1ea0230"},
+                     "patch-nginx.conf", "3360af05330d4a6c0a575f820aec57edac19f3de9053941233920ac7d1ea0230"},
       {:eex_cache,   "3360af05330d4a6c0a575f820aec57edac19f3de9053941233920ac7d1ea0230",
-                     64247892, 2701,
-                     "8f123060d309acf6ace6dd4902aa9d60dcadca1153aed5f43f9966df78c9403a"},
+                     69552268, 2699, "8efafdf496494b41f20a7c78d2b009c0d172480517b0af6eabb4052b41be7c04"},
       {:patch_cache, "4355a9d2f26b3329f0b0008fe9d63b4f03b82235cc0bc8c0448366f18b384ce1",
-                     "patch-sshd_config-0001",
+                     "patch-sshd_config",
                      "19dabd66195b176ef39d90f8e1eb19d9cc0b31a77402066423171b5ca5e8b974"},
       {:eex_cache,   "19dabd66195b176ef39d90f8e1eb19d9cc0b31a77402066423171b5ca5e8b974",
                      106440519, 4046,
@@ -182,7 +202,7 @@ defmodule HighlevelTest do
       {:installed, {:pkg, "nginx", "1.6.2_1,2"}},
       {:running, {:svc, "nginx"}}, {:running, {:svc, "sshd"}},
       {:file_meta, "/etc/ssh/sshd_config", :file, 0, 0, 644, [:uarch], 4046, "63cfe919e32b41d766416b2354eb816ffa6dd0d4608ee2f03e44ba964398df5a"},
-      {:file_meta, "/usr/local/etc/nginx/nginx.conf", :file, 0, 0, 644, [:uarch], 2701, "8f123060d309acf6ace6dd4902aa9d60dcadca1153aed5f43f9966df78c9403a"},
+      {:file_meta, "/usr/local/etc/nginx/nginx.conf", :file, 0, 0, 644, [:uarch], 2699, "8efafdf496494b41f20a7c78d2b009c0d172480517b0af6eabb4052b41be7c04"},
     ]
 
     assert sc |> SC.justified |> Enum.sort == [
@@ -192,7 +212,7 @@ defmodule HighlevelTest do
       {:file_meta, "/etc/ssh/sshd_config", :file, 0, 0, 644, [:uarch], 4046, "63cfe919e32b41d766416b2354eb816ffa6dd0d4608ee2f03e44ba964398df5a"},
       {:file_meta, "/usr", :dir, 0, 0, 755, [:uarch], nil, nil}, {:file_meta, "/usr/local", :dir, 0, 0, 755, [:uarch], nil, nil},
       {:file_meta, "/usr/local/etc", :dir, 0, 0, 755, [:uarch], nil, nil}, {:file_meta, "/usr/local/etc/nginx", :dir, 0, 0, 755, [:uarch], nil, nil},
-      {:file_meta, "/usr/local/etc/nginx/nginx.conf", :file, 0, 0, 644, [:uarch], 2701, "8f123060d309acf6ace6dd4902aa9d60dcadca1153aed5f43f9966df78c9403a"},
+      {:file_meta, "/usr/local/etc/nginx/nginx.conf", :file, 0, 0, 644, [:uarch], 2699, "8efafdf496494b41f20a7c78d2b009c0d172480517b0af6eabb4052b41be7c04"},
       {:file_meta, "/usr/local/etc/nginx/nginx.conf-dist", :file, 0, 0, 644, [:uarch], 2693, "6418ea5b53e0c2b4e9baa517fce7ccf7619db03af68de7445dccb2c857978a4a"},
       {:file_meta, "/usr/sbin", :dir, 0, 0, 755, [:uarch], nil, nil},
       {:file_meta, "/usr/sbin/sshd", :file, 0, 0, 555, [:uarch], 297792, "819b1edb37352186f3fdac8fb61010d4008cf93b7093cea6063615c785bfd1ae"},
@@ -200,7 +220,7 @@ defmodule HighlevelTest do
 
     assert sc |> SC.required_files |> Enum.sort == [
       {:file_meta, "/etc/ssh/sshd_config", :file, 0, 0, 644, [:uarch], 4046, "63cfe919e32b41d766416b2354eb816ffa6dd0d4608ee2f03e44ba964398df5a"},
-      {:file_meta, "/usr/local/etc/nginx/nginx.conf", :file, 0, 0, 644, [:uarch], 2701, "8f123060d309acf6ace6dd4902aa9d60dcadca1153aed5f43f9966df78c9403a"},
+      {:file_meta, "/usr/local/etc/nginx/nginx.conf", :file, 0, 0, 644, [:uarch], 2699, "8efafdf496494b41f20a7c78d2b009c0d172480517b0af6eabb4052b41be7c04"},
     ]
 
     mtree_lines = sc |> SC.mtree |> Enum.sort
@@ -209,7 +229,7 @@ defmodule HighlevelTest do
       "./etc/ssh/sshd_config type=file uid=0 gid=0 mode=0644 size=4046 sha256digest=63cfe919e32b41d766416b2354eb816ffa6dd0d4608ee2f03e44ba964398df5a flags=uarch\n",
       "./usr type=dir uid=0 gid=0 mode=0755 flags=uarch\n", "./usr/local type=dir uid=0 gid=0 mode=0755 flags=uarch\n",
       "./usr/local/etc type=dir uid=0 gid=0 mode=0755 flags=uarch\n", "./usr/local/etc/nginx type=dir uid=0 gid=0 mode=0755 flags=uarch\n",
-      "./usr/local/etc/nginx/nginx.conf type=file uid=0 gid=0 mode=0644 size=2701 sha256digest=8f123060d309acf6ace6dd4902aa9d60dcadca1153aed5f43f9966df78c9403a flags=uarch\n",
+      "./usr/local/etc/nginx/nginx.conf type=file uid=0 gid=0 mode=0644 size=2699 sha256digest=8efafdf496494b41f20a7c78d2b009c0d172480517b0af6eabb4052b41be7c04 flags=uarch\n",
       "./usr/local/etc/nginx/nginx.conf-dist type=file uid=0 gid=0 mode=0644 size=2693 sha256digest=6418ea5b53e0c2b4e9baa517fce7ccf7619db03af68de7445dccb2c857978a4a flags=uarch\n",
       "./usr/sbin type=dir uid=0 gid=0 mode=0755 flags=uarch\n",
       "./usr/sbin/sshd type=file uid=0 gid=0 mode=0555 size=297792 sha256digest=819b1edb37352186f3fdac8fb61010d4008cf93b7093cea6063615c785bfd1ae flags=uarch\n",

@@ -3,7 +3,7 @@ defmodule SymConfig.RestartProvision do
 end
 
 defmodule SymConfig.State do
-  defstruct host: nil, port: 22, user: nil, ssh_options: nil, con: nil, edb: nil
+  defstruct host: nil, port: 22, user: nil, ssh_options: nil, con: nil, edb: nil, vars_fun: nil
 end
 
 defmodule SymConfig do
@@ -13,10 +13,18 @@ defmodule SymConfig do
   alias SymConfig.Inference
   alias SymConfig.RestartProvision
 
-  def init(host,user\\"root",port\\22,options\\[]) do
+  def init(vars,host,user\\"root",port\\22,options\\[]) do
+    vars_fun = case vars do
+      vars when is_map(vars) ->
+        fn varset -> vars[varset] end
+      vars when is_function(vars) ->
+        vars
+    end
+    pl_file = Path.join(SymConfig.Cfg.pl_dir,"symconfig.pl")
+    Logger.debug "Loading inference core from #{pl_file}"
     edb = Exlog.new
-          |> Exlog.consult!("priv/symconfig.pl")
-    %State{host: host, user: user, port: port, ssh_options: options, edb: edb}
+          |> Exlog.consult!(pl_file)
+    %State{host: host, user: user, port: port, ssh_options: options, edb: edb, vars_fun: vars_fun}
     |> connect
   end
 
@@ -249,6 +257,9 @@ defmodule SymConfig do
       _ -> false
     end
   end
+
+  def vars(_,nil), do: []
+  def vars(s=%State{vars_fun: f},id), do: f.(id)
 
   def provision!(s=%State{}) do
     way = s.edb

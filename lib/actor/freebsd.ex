@@ -3,18 +3,9 @@ defmodule Actor.FreeBSD do
   require Logger
   alias SymConfig, as: SC
   require Exlog
-  require SymConfig
-  alias SymConfig.Cfg
+  require SC
+  alias SC.Cfg
 
-  @managed   %{
-    "/usr/local/etc/nginx/nginx.conf-dist" => [
-      port: 8080,
-      server: "www.example.com",
-    ],
-    "/etc/ssh/sshd_config" => [
-      ports: [22,3333],
-    ],
-  }
   @name __MODULE__
 
   def act(sc,action) do
@@ -27,7 +18,7 @@ defmodule Actor.FreeBSD do
     sc
   end
 
-  defp act1(sc,{:fill_cache,{:patch_cache,src_file,src_sha,patch_id,last_ver}}) do
+  defp act1(sc,{:fill_cache,{:patch_cache,src_file,src_sha,patch_id,last_ver,varset}}) do
     # download source file if not cached
     src_fpath = Path.join [Cfg.orig_dir, src_sha]
     unless File.exists? src_fpath do
@@ -56,8 +47,7 @@ defmodule Actor.FreeBSD do
     end)
     Logger.debug "New template file #{templ_fpath}"
 
-    # @TODO: variables
-    bindings = @managed[src_file]
+    bindings = sc |> SC.vars(varset)
     bindings_hash = :erlang.phash2 bindings
     dst_content = EEx.eval_file templ_fpath, bindings
 

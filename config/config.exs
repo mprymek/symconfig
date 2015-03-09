@@ -27,6 +27,7 @@ config :logger, :console,
   format: "\n[$level] $levelpad$message"
 
 config :sym_config,
+  pl_dir:        "priv",
   cache_dir:     "priv/cache",
   orig_dir:      "priv/orig",
   patches_dir:   "priv/patches",

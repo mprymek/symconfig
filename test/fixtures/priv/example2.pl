@@ -33,14 +33,14 @@ file_meta(os(freebsd,"10.1-RELEASE-p5"),"/etc/ssh/sshd_config",file,0,0,644,[uar
 %%
 
 latest(patch("patch-nginx.conf","0001")).
-peex_managed("/usr/local/etc/nginx/nginx.conf-dist","/usr/local/etc/nginx/nginx.conf","patch-nginx.conf").
-patch_cache("6418ea5b53e0c2b4e9baa517fce7ccf7619db03af68de7445dccb2c857978a4a","patch sha here","tmplsha1").
-eex_cache("tmplsha1","var hash here",2701,"deadbeaf").
+peex_managed("/usr/local/etc/nginx/nginx.conf-dist","/usr/local/etc/nginx/nginx.conf","patch-nginx.conf",nginx).
+patch_cache("6418ea5b53e0c2b4e9baa517fce7ccf7619db03af68de7445dccb2c857978a4a","patch-nginx.conf","tmplsha1").
+eex_cache("tmplsha1","nginx varshash",2701,"deadbeaf").
 
 latest(patch("patch-sshd_conf","0001")).
-peex_managed("/etc/ssh/sshd_config","/etc/ssh/sshd_config","patch-sshd_config").
-patch_cache("26748c51687fe4f09ac6c8ace864d0c545f1fc0aa059bb9bffd80f80c0d62d85","patch sha here","tmplsha2").
-eex_cache("tmplsha2","var hash here",4046,"ba11ad").
+peex_managed("/etc/ssh/sshd_config","/etc/ssh/sshd_config","patch-sshd_conf",sshd).
+patch_cache("26748c51687fe4f09ac6c8ace864d0c545f1fc0aa059bb9bffd80f80c0d62d85","patch-sshd_conf","tmplsha2").
+eex_cache("tmplsha2","sshd varshash",4046,"ba11ad").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% EXAMPLE USER-PROVIDED RULES
@@ -60,6 +60,9 @@ depends(managed(file("/etc/ssh/sshd_config")),installed(os(freebsd,"10.1-RELEASE
 %%
 %% required state definition for particular server
 %%
+
+varset_hash(nginx,"nginx varshash").
+varset_hash(sshd, "sshd varshash").
 
 want(running(svc("nginx"))).
 want(running(svc("sshd"))).
